@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+
+  <?!= include("STYLESHEET"); ?>    
+<script
+  src="https://code.jquery.com/jquery-3.2.1.min.js"
+  integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+  crossorigin="anonymous"></script>
+
+  <script src="https://unpkg.com/masonry-layout@4.2.0/dist/masonry.pkgd.min.js"
+    crossorigin="anonymous"></script>
+<script src="https://unpkg.com/imagesloaded@4/imagesloaded.pkgd.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.19.1/moment-with-locales.min.js"
+    crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.6.2/fullcalendar.min.js"
+    crossorigin="anonymous"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.6.2/fullcalendar.min.css" rel="stylesheet">
+  
+  
+  <!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+        
+  </head>
+  <body>
+    <div class="grid staffGrid">
+    <div class="grid-item titlegrid"><div class="title">Who's On Shift?</div></div>
+    </div>
+    <script>
+    
+    // http://tinyurl.com/gumh-onshift
+
+var staffChecklist = false;
+var staffOnShift = false;
+var meritBadgeIconList = false;
+var refreshInterval = 300000; // in milliseconds
+
+function getStaffChecklist(callback){
+  google.script.run
+  .withFailureHandler(function(error){console.log(error);})
+  .withSuccessHandler(function(data){
+    staffChecklist = data;
+    console.log(staffChecklist);
+    if(callback){callback();}
+  }).getStaffChecklist(); 
+}
+
+function getStaffOnShift(startTime, endTime, currentTime, callback){
+  google.script.run
+  .withFailureHandler(function(error){console.log(error);})
+  .withSuccessHandler(function(data){
+    staffOnShift = data;
+    console.log(staffOnShift);
+    if(callback){callback();}
+  }).getStaffOnShift(startTime, endTime, currentTime); 
+}
+
+function getMeritBadgeIconList(callback){
+  google.script.run
+  .withFailureHandler(function(error){console.log(error);})
+  .withSuccessHandler(function(data){
+    meritBadgeIconList = data;
+    console.log(meritBadgeIconList);
+    if(callback){callback();}
+  }).getMeritBadgeIconList(); 
+}
+
+function showStaffOnShift(){
+  var staff = Object.keys(staffOnShift);
+  clearAll();  
+  if(staff.length == 0){
+    var staffdiv = $("<div class='grid-item noone refreshable'></div>");
+    $(staffdiv).append("<div class='name'>No One</div>");
+    $(".grid").append(staffdiv).masonry("appended", staffdiv);
+  }
+  
+  
+  console.log(staffChecklist);
+  $.each(staff, function(key, email){
+    console.log(email);
+    var checklist = staffChecklist.checklistData.data.filter(function(s){
+      return (s.NetId + "@georgetown.edu").toLowerCase() == email.toLowerCase();
+    })[0];
+    
+    if(!checklist){
+      return true;
+    }
+    var sched = staffOnShift[email];
+
+    var img = checklist["Pic on Website"];
+    var name = checklist["Name"];
+    var shiftStart = moment(sched[0].startTime);
+    var shiftEnd = moment(sched[0].endTime);
+    
+    var meritBadgeList = [];
+    $.each(Object.keys(meritBadgeIconList), function(index, meritBadge){
+      if(checklist[meritBadge]){
+        meritBadgeList.push(meritBadge);
+      }
+    });
+    var meritBadgeString = meritBadgeList.join(", ");
+    
+    var time = shiftStart.format("h:mm") + " - "  + shiftEnd.format("h:mm a");
+        
+    var staffdiv = $("<div class='grid-item refreshable'></div>");
+    if(img.trim().match(/http/)){
+      $(staffdiv).append("<img width='300' src='"+img+"' />");
+    }
+    $(staffdiv).append("<div class='name'>"+name+"</div>");
+    $(staffdiv).append("<div class='time'>"+time+"</div>");
+    $(staffdiv).append("<div class='meritbadges'>"+meritBadgeString+"</div>");
+    
+    $(".grid").append(staffdiv).masonry("appended", staffdiv);
+    
+    $(".grid").masonry("layout");
+
+  });
+  setTimeout(function(){
+    $(".grid").masonry("layout");
+  }, 500);
+}
+
+
+function maybeShowStaffOnShift(){
+  if(staffOnShift && staffChecklist && meritBadgeIconList){
+    showStaffOnShift();
+  }
+}
+
+
+function startScrolling(){
+  scrollDown();
+}
+
+function scrollUp(){
+  $('html').animate({scrollTop: 0 }, 2000 , 'swing', function(){
+    setTimeout(function(){
+      scrollDown();
+    }, 2000);
+  });
+}
+
+function scrollDown(){
+  $('html').animate({scrollTop: $(document).height()-$(window).height() }, 2000, 'swing', function(){
+    setTimeout(function(){
+      scrollUp();
+    }, 2000);  
+  });
+}
+
+function clearAll(){
+  $(".refreshable").remove();
+}
+
+
+function refreshDisplay(){
+
+  //var now = moment("2017-12-14 18:30", "YYYY-MM-DD HH:mm");
+  var now = moment();
+  var startTime = moment(now).add(-5, "minutes");
+  var endTime = moment(now).add(5, "minutes");
+  
+  getStaffChecklist(maybeShowStaffOnShift);
+  getMeritBadgeIconList(maybeShowStaffOnShift);
+  getStaffOnShift(startTime.toString(), endTime.toString(), now.toString(), maybeShowStaffOnShift);
+
+}
+
+$(function() {
+  moment().format();
+// see https://fullcalendar.io/docs/utilities/Moment/
+// see https://fullcalendar.io/docs/
+
+  var $grid = $('.grid').masonry({
+    columnWidth: 300,
+    itemSelector: '.grid-item',
+    gutter: 10
+  });
+  
+  $grid.imagesLoaded().progress( function() {
+    console.log("images loaded");
+    $grid.masonry('layout');
+  });
+  
+  refreshDisplay();
+  startScrolling();
+  setInterval(refreshDisplay, refreshInterval);
+});
+
+
+    </script>
+  </body>
+</html>
+
+
